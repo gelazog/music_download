@@ -376,8 +376,14 @@ def build_ydl_opts(
 
     pps = opts.setdefault("postprocessors", [])
 
-    if metadata:
-        pps.append({"key": "FFmpegMetadata", "add_infojson": "if_exists"})
+    # add_chapters incrusta las marcas de capitulo. Antes aqui habia un
+    # FFmpegSplitChapters, que no incrusta nada: trocea la descarga en un
+    # archivo por capitulo, que no es lo que promete la casilla.
+    if metadata or embed_chapters:
+        pps.append({"key": "FFmpegMetadata",
+                    "add_metadata": metadata,
+                    "add_chapters": embed_chapters,
+                    "add_infojson": "if_exists"})
     if thumbnail and is_audio:
         opts["writethumbnail"] = True
         pps.append({"key": "EmbedThumbnail"})
@@ -385,8 +391,6 @@ def build_ydl_opts(
         opts["writesubtitles"] = True
         opts["subtitleslangs"] = ["es", "en"]
         opts["embedsubtitles"] = True
-    if embed_chapters:
-        pps.append({"key": "FFmpegSplitChapters", "force_keyframes": False})
     if sponsor_block:
         opts["sponsorblock_remove"] = ["sponsor", "selfpromo", "interaction"]
     if normalize and is_audio:

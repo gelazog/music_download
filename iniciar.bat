@@ -252,7 +252,7 @@ REM ============================================================
 REM  :preguntar <mensaje>   -> errorlevel 1 = si, 2 = no
 :preguntar
 if defined AUTO exit /b 1
-choice /c SN /n /m "%~1 [S/N] "
+choice /c SN /n /m "%~1 [S/N] " 2>nul
 exit /b %errorlevel%
 
 REM  :pkg <modulo> <spec_pip> <para_que_sirve>

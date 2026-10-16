@@ -483,7 +483,7 @@ class YTDownApp(ctk.CTk):
             (self.opt_playlist,   "Lista completa"),
             (self.opt_normalize,  "Normalizar audio"),
             (self.opt_sponsor,    "Saltar patrocinios"),
-            (self.opt_chapters,   "Capítulos"),
+            (self.opt_chapters,   "Marcas de capítulo"),
             (self.opt_skip_done,  "No repetir descargados"),
         ]
         for i, (var, txt) in enumerate(chks):
@@ -534,16 +534,21 @@ class YTDownApp(ctk.CTk):
         ctk.CTkButton(frow, text="Abrir", width=70, height=28,
                       fg_color="transparent", border_width=1, border_color="#444",
                       text_color=TEXT_SEC, hover_color=BG_INPUT, font=("", 11),
-                      command=self._open_folder).grid(row=0, column=3, padx=(0, 10))
+                      command=self._open_folder).grid(row=0, column=3, padx=(0, 4))
+        ctk.CTkButton(frow, text="Limpiar sobras", width=108, height=28,
+                      fg_color="transparent", border_width=1, border_color="#444",
+                      text_color=TEXT_SEC, hover_color=BG_INPUT, font=("", 11),
+                      command=self._clean_leftovers
+                      ).grid(row=0, column=4, padx=(0, 10))
 
         ctk.CTkLabel(frow, text="Límite:", font=("", 11), text_color=TEXT_SEC
-                     ).grid(row=0, column=4, padx=(6, 4))
+                     ).grid(row=0, column=5, padx=(6, 4))
         ctk.CTkEntry(frow, textvariable=self.rate_limit_var,
                      placeholder_text="ej. 500K", width=80, height=28,
                      font=("", 11), fg_color=BG_INPUT, border_color=BORDER,
                      border_width=1, text_color=TEXT_PRI,
                      placeholder_text_color=TEXT_MUT
-                     ).grid(row=0, column=5, padx=(0, 14), pady=8)
+                     ).grid(row=0, column=6, padx=(0, 14), pady=8)
 
     def _build_cookies_section(self, p):
         crow = ctk.CTkFrame(p, fg_color=BG_CARD, corner_radius=10,
@@ -807,6 +812,52 @@ class YTDownApp(ctk.CTk):
         import subprocess
         Path(self.folder).mkdir(parents=True, exist_ok=True)
         subprocess.Popen(["explorer", str(Path(self.folder))])
+
+    def _clean_leftovers(self):
+        """Borra restos de descargas fallidas, siempre preguntando antes."""
+        from tkinter import messagebox
+        # La raíz de un disco no: recorrerla entera es lento y ahí hay .webp de
+        # cachés de navegador y de medio programa instalado. No es basura mía.
+        raiz = Path(self.folder).resolve()
+        if raiz.parent == raiz:
+            self._banner.show(
+                f"Tu carpeta de descargas es {raiz}, la raíz del disco. No voy "
+                f"a rastrear un disco entero buscando qué borrar: elige una "
+                f"carpeta concreta con 'Cambiar'.", "warn")
+            return
+
+        sobras, total = cvt.find_leftovers(self.folder)
+        if not sobras:
+            self._banner.show(
+                "No hay sobras en la carpeta de descargas: todo limpio.", "ok")
+            return
+
+        ejemplos = "\n".join(f"  · {p.name[:58]}" for p in sobras[:5])
+        if len(sobras) > 5:
+            ejemplos += f"\n  … y {len(sobras) - 5} más"
+        if not messagebox.askyesno(
+                "Limpiar sobras",
+                f"Encontré {len(sobras)} archivo(s) ({fmt_size(total)}) que "
+                f"dejaron descargas a medias:\n\n{ejemplos}\n\n"
+                "Son portadas sueltas (.webp) y descargas incompletas (.part). "
+                "No se toca ningún audio ni video.\n\n¿Los borro?",
+                icon="warning", parent=self):
+            return
+
+        borrados = fallos = 0
+        for p in sobras:
+            try:
+                p.unlink()
+                borrados += 1
+            except OSError as e:
+                log.warning("No se pudo borrar %s: %s", p, e)
+                fallos += 1
+
+        msg = f"{borrados} archivo(s) borrados ({fmt_size(total)} liberados)."
+        if fallos:
+            msg += f"  {fallos} no se pudieron borrar (¿en uso?)."
+        self._banner.show(msg, "ok" if not fallos else "warn")
+        self._set_status(msg, GREEN)
 
     def _short(self, url: str) -> str:
         return url if len(url) <= 60 else url[:57] + "…"

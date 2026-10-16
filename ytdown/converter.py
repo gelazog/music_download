@@ -189,6 +189,51 @@ def scan_folder(folder: str | Path, *, recursive: bool = True,
     return ScanResult(files=seguros, videos=videos, others=otros, probed=probados)
 
 
+# Restos que deja una descarga que no llegó a terminar. Solo .webp: es lo que
+# yt-dlp escribe como portada de YouTube y nadie guarda galerías en ese
+# formato, así que borrarlo no se lleva por delante nada del usuario.
+# shortcut: no mira .jpg/.png, que sí podrían ser imágenes propias; ampliar
+# solo si aparecen sobras en esos formatos.
+LEFTOVER_THUMB_EXTS = {".webp"}
+LEFTOVER_PARTIAL_EXTS = {".part", ".ytdl"}
+
+
+def find_leftovers(folder: str | Path, *, recursive: bool = True
+                   ) -> tuple[list[Path], int]:
+    """Sobras de descargas fallidas: (archivos, bytes que ocupan).
+
+    Una portada cuenta como huérfana cuando no hay ningún audio ni video con
+    su mismo nombre al lado. yt-dlp la borra al incrustarla, así que si sigue
+    ahí es que la descarga se quedó a medias.
+    """
+    root = Path(folder)
+    if not root.is_dir():
+        return [], 0
+
+    archivos = [p for p in (root.rglob("*") if recursive else root.glob("*"))
+                if p.is_file()]
+    medios = {(p.parent, p.stem) for p in archivos
+              if p.suffix.lower() in (AUDIO_EXTS | VIDEO_EXTS)}
+
+    sobras = []
+    for p in archivos:
+        ext = p.suffix.lower()
+        if ext in LEFTOVER_PARTIAL_EXTS:
+            sobras.append(p)
+        elif ext in LEFTOVER_THUMB_EXTS and (p.parent, p.stem) not in medios:
+            sobras.append(p)
+
+    total = 0
+    for p in sobras:
+        try:
+            total += p.stat().st_size
+        except OSError:
+            pass
+    sobras.sort(key=lambda p: str(p).lower())
+    log.info("Sobras en %s: %d archivo(s), %d bytes", root, len(sobras), total)
+    return sobras, total
+
+
 def probe(path: str | Path) -> dict:
     """Duración y si el archivo lleva carátula incrustada.
 
