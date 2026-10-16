@@ -527,40 +527,48 @@ class DownloadManager:
         gap = SPEED_PROFILES[self.speed]["pausa"]
         started = time.time()
 
-        for i, job in enumerate(jobs):
-            if self._stop_event.is_set():
-                break
-            if not self._wait_if_paused():
-                break
+        try:
+            for i, job in enumerate(jobs):
+                if self._stop_event.is_set():
+                    break
+                if not self._wait_if_paused():
+                    break
 
-            jid = job.get("id", i)
+                jid = job.get("id", i)
 
-            # Puede haberse descargado hace un momento: la misma canción sale
-            # en dos playlists distintas más a menudo de lo que parece.
-            if job.get("skip_known") and job.get("key") and job.get("fmt"):
-                if history.has(job["key"], job["fmt"]):
-                    summary["skipped"] += 1
-                    log.info("[%s] Omitido: ya estaba descargado", jid)
-                    if cb := cbs.get("on_item_done"):
-                        cb(jid, False, "", {"skipped": True, "path":
-                                            (history.get(job["key"], job["fmt"]) or {}).get("path", "")})
-                    continue
+                # Puede haberse descargado hace un momento: la misma canción sale
+                # en dos playlists distintas más a menudo de lo que parece.
+                if job.get("skip_known") and job.get("key") and job.get("fmt"):
+                    if history.has(job["key"], job["fmt"]):
+                        summary["skipped"] += 1
+                        log.info("[%s] Omitido: ya estaba descargado", jid)
+                        if cb := cbs.get("on_item_done"):
+                            cb(jid, False, "", {"skipped": True, "path":
+                                                (history.get(job["key"], job["fmt"]) or {}).get("path", "")})
+                        continue
 
-            if cb := cbs.get("on_item_start"):
-                cb(jid, i, total)
+                if cb := cbs.get("on_item_start"):
+                    cb(jid, i, total)
 
-            # Pausa anti-rate-limit entre descargas
-            if i > 0 and not self._sleep_interruptible(random.uniform(*gap)):
-                break
+                # Pausa anti-rate-limit entre descargas
+                if i > 0 and not self._sleep_interruptible(random.uniform(*gap)):
+                    break
 
-            ok, err, info = self._run_single(job, cbs, jid)
-            if ok:
-                summary["ok"] += 1
-            elif err != "cancelado":
-                summary["error"] += 1
+                ok, err, info = self._run_single(job, cbs, jid)
+                if ok:
+                    summary["ok"] += 1
+                elif err != "cancelado":
+                    summary["error"] += 1
 
-            if cb := cbs.get("on_item_done"):
-                cb(jid, ok, err, info)
+                if cb := cbs.get("on_item_done"):
+                    cb(jid, ok, err, info)
+        except Exception as e:
+            # Si el hilo muere aqui, 'running' se queda en True y la UI
+            # no vuelve a dejar empezar nada. El cierre de abajo tiene
+            # que ejecutarse pase lo que pase.
+            log.exception("El worker de descargas revento")
+            summary["error"] += 1
+            summary["crash"] = str(e)
 
         summary["cancelled"] = self._stop_event.is_set()
         summary["elapsed"] = time.time() - started

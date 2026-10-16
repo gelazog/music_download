@@ -134,6 +134,12 @@ class Analyzer:
                 self._gate.wait()
                 if not self._stop.is_set():
                     self._analyze_one(item_id, url, browser, expand)
+            except Exception as e:
+                # Un item raro no puede llevarse por delante el hilo: si muere,
+                # los siguientes se quedan colgados en "analizando" para siempre.
+                log.exception("Análisis del item %d reventó", item_id)
+                if cb := self._cbs.get("on_error"):
+                    cb(item_id, str(e))
             finally:
                 with self._lock:
                     self._inflight -= 1
@@ -150,6 +156,15 @@ class Analyzer:
             log.warning("Análisis falló (item %d): %s", item_id, msg[:160])
             if cb := self._cbs.get("on_error"):
                 cb(item_id, msg)
+            return
+
+        if not info:
+            # yt-dlp devuelve None en vez de lanzar en algunos casos. Sin esto,
+            # el item se quedaba en "analizando" y nadie volvía a tocarlo.
+            log.warning("Análisis del item %d sin datos (yt-dlp devolvió None)",
+                        item_id)
+            if cb := self._cbs.get("on_error"):
+                cb(item_id, "YouTube no devolvió información de este enlace.")
             return
 
         is_playlist = info.get("_type") == "playlist"

@@ -30,6 +30,7 @@ from .constants import (
 from .cookies import (BROWSERS, detect_browser, resolve_browser,
                       export_netscape_cookies, cookies_exported,
                       invalidate_caches as cookies_invalidate,
+                      cleanup as cookies_cleanup,
                       _is_browser_running, _profile_exists)
 from .downloader import DownloadManager, build_ydl_opts
 from .history import shared as history
@@ -2593,6 +2594,10 @@ class YTDownApp(ctk.CTk):
         if self._converter.running:
             self._converter.cancel()
         self._analyzer.stop()
+        # El archivo de cookies es una sesión de YouTube abierta en texto
+        # plano dentro de %TEMP%. Existía cleanup() pero nadie lo llamaba, así
+        # que se quedaba ahí para siempre después de cerrar.
+        cookies_cleanup()
         history.save(force=True)
         cfg_mod.save({
             **self._cfg,   # preserva claves que no maneja la UI (last_update_check…)

@@ -549,33 +549,41 @@ class Converter:
                    "cancelado": False, "elapsed": 0.0, "bytes": 0}
         inicio = time.time()
 
-        for i, job in enumerate(jobs):
-            if self._stop.is_set():
-                break
-            while self.paused and not self._stop.is_set():
-                time.sleep(0.15)
-            if self._stop.is_set():
-                break
+        try:
+            for i, job in enumerate(jobs):
+                if self._stop.is_set():
+                    break
+                while self.paused and not self._stop.is_set():
+                    time.sleep(0.15)
+                if self._stop.is_set():
+                    break
 
-            jid = job["id"]
-            src = Path(job["src"])
-            if cb := cbs.get("on_item_start"):
-                cb(jid, i, len(jobs), src.name)
+                jid = job["id"]
+                src = Path(job["src"])
+                if cb := cbs.get("on_item_start"):
+                    cb(jid, i, len(jobs), src.name)
 
-            ok, msg, dst = self._convert_one(job, cbs)
-            if ok:
-                resumen["ok"] += 1
-                try:
-                    resumen["bytes"] += Path(dst).stat().st_size
-                except OSError:
-                    pass
-            elif msg == "omitido":
-                resumen["omitidos"] += 1
-            elif msg != "cancelado":
-                resumen["error"] += 1
+                ok, msg, dst = self._convert_one(job, cbs)
+                if ok:
+                    resumen["ok"] += 1
+                    try:
+                        resumen["bytes"] += Path(dst).stat().st_size
+                    except OSError:
+                        pass
+                elif msg == "omitido":
+                    resumen["omitidos"] += 1
+                elif msg != "cancelado":
+                    resumen["error"] += 1
 
-            if cb := cbs.get("on_item_done"):
-                cb(jid, ok, msg, dst)
+                if cb := cbs.get("on_item_done"):
+                    cb(jid, ok, msg, dst)
+        except Exception as e:
+            # Si el hilo muere aqui, 'running' se queda en True y la UI
+            # no vuelve a dejar empezar nada. El cierre de abajo tiene
+            # que ejecutarse pase lo que pase.
+            log.exception("El worker de conversion revento")
+            resumen["error"] += 1
+            resumen["crash"] = str(e)
 
         resumen["cancelado"] = self._stop.is_set()
         resumen["elapsed"] = time.time() - inicio
