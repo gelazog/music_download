@@ -18,14 +18,6 @@ dist/
 # Llevan rutas con el nombre de usuario de Windows y perfiles del navegador.
 .claude/
 
-# ── Versiones antiguas, ya sustituidas ────────────────────────────────────────
-# main.py y main1.py son idénticos entre sí: el monolito de antes de partir el
-# código en el paquete ytdown/. convertidor.py lo reemplazó la pestaña
-# Convertir. Nadie los importa; puedes borrarlos cuando quieras.
-main.py
-main1.py
-convertidor.py
-
 # ── Datos del usuario ─────────────────────────────────────────────────────────
 .ytdown_config.json
 .ytdown_history.json
