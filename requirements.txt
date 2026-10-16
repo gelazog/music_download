@@ -1,0 +1,11 @@
+# Instalación:  pip install -r requirements.txt
+# (iniciar.bat ya lo hace por ti y además comprueba FFmpeg y Python)
+
+customtkinter          # la interfaz
+yt-dlp[default]        # el motor de descarga; [default] incluye yt-dlp-ejs
+curl_cffi>=0.10,<0.16  # imita la huella TLS de un navegador real
+Pillow                 # miniaturas y portadas
+requests               # descarga de miniaturas
+
+# FFmpeg NO se instala con pip. Ponlo junto a la app (ffmpeg.exe + ffprobe.exe)
+# o en el PATH. La pestaña "Requisitos" lo instala con un clic.

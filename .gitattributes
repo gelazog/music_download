@@ -1,0 +1,7 @@
+# Los .bat con saltos de línea LF pueden fallar en los goto/labels de cmd.exe:
+# este archivo se queda en CRLF sí o sí.
+*.bat text eol=crlf
+
+# El resto, saltos normalizados en el repo y nativos al hacer checkout.
+* text=auto
+*.exe binary
